@@ -1,0 +1,101 @@
+// Finder - Startup Opportunity Discovery
+// Run: npx prisma generate && npx prisma db push (or migrate dev)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String   @id @default(cuid())
+  email             String   @unique
+  passwordHash      String?  // null if OAuth
+  startupName       String
+  subscriptionTier  String   @default("free") // free | premium
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  profile   UserProfile?
+  applications Application[]
+  documents   Document[]
+}
+
+model UserProfile {
+  id                  String   @id @default(cuid())
+  userId              String   @unique
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Startup Identity
+  startupName         String
+  description         String?
+  registeredBusiness  Boolean  @default(false)
+  registrationNumber  String?
+
+  // Qualification
+  sectors             String[] // array in PostgreSQL
+  stage               String
+  location            String
+  teamSize            String
+  revenueRange        String
+  categories          String[]
+
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+model Opportunity {
+  id                  String   @id @default(cuid())
+  title               String
+  organization        String
+  type                String   // Grant, Accelerator, etc.
+  deadline            DateTime
+  shortDescription    String
+  summary             String
+  matchPercent        Int?
+  eligibility         String?
+  requiredDocuments   String[]
+  applicationQuestions String[]
+  sector              String?
+  stage               String?
+
+  applications        Application[]
+}
+
+model Application {
+  id                String   @id @default(cuid())
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  opportunityId     String
+  opportunity       Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  opportunityTitle  String
+  status            String   @default("draft") // draft | completed
+  progressPercent   Int      @default(0)
+  answers           Json     @default("{}")   // Record<string, string>
+  lastUpdated       DateTime @updatedAt
+
+  @@unique([userId, opportunityId])
+}
+
+model Document {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  uploadDate  DateTime @default(now())
+  size        Int?
+  storagePath String?  // S3/path for file storage
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String   // Could add User relation if needed
+  title     String
+  message   String
+  type      String   // opportunity_match | deadline | incomplete_application
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}

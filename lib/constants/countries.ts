@@ -1,0 +1,31 @@
+/**
+ * ISO 3166-1 alpha-2 country codes (max 3 chars for API)
+ */
+export const COUNTRIES: { code: string; name: string }[] = [
+  { code: "US", name: "United States" },
+  { code: "GB", name: "United Kingdom" },
+  { code: "NG", name: "Nigeria" },
+  { code: "CA", name: "Canada" },
+  { code: "AU", name: "Australia" },
+  { code: "DE", name: "Germany" },
+  { code: "FR", name: "France" },
+  { code: "KE", name: "Kenya" },
+  { code: "GH", name: "Ghana" },
+  { code: "ZA", name: "South Africa" },
+  { code: "IN", name: "India" },
+  { code: "SG", name: "Singapore" },
+  { code: "NL", name: "Netherlands" },
+  { code: "ES", name: "Spain" },
+  { code: "IT", name: "Italy" },
+  { code: "BR", name: "Brazil" },
+  { code: "MX", name: "Mexico" },
+  { code: "IE", name: "Ireland" },
+  { code: "IL", name: "Israel" },
+  { code: "JP", name: "Japan" },
+  { code: "KR", name: "South Korea" },
+  { code: "SE", name: "Sweden" },
+  { code: "CH", name: "Switzerland" },
+  { code: "AE", name: "United Arab Emirates" },
+  { code: "ET", name: "Ethiopia" },
+  { code: "XX", name: "Other" },
+];
