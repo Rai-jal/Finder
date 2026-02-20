@@ -5,6 +5,31 @@ import type { User, SubscriptionTier } from "@/types";
 import { login, signup, logout as apiLogout } from "@/lib/api";
 import { apiMe, apiGetSubscription, getToken } from "@/lib/api/client";
 
+const PREMIUM_STORAGE_KEY = "finder_subscription_tier";
+
+function getStoredTier(): SubscriptionTier | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const s = localStorage.getItem(PREMIUM_STORAGE_KEY);
+    return s === "premium" ? "premium" : null;
+  } catch {
+    return null;
+  }
+}
+
+function setStoredTier(tier: SubscriptionTier | null) {
+  if (typeof window === "undefined") return;
+  try {
+    if (tier === "premium") {
+      localStorage.setItem(PREMIUM_STORAGE_KEY, "premium");
+    } else {
+      localStorage.removeItem(PREMIUM_STORAGE_KEY);
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
 interface AuthContextValue {
   user: User | null;
   isAuthenticated: boolean;
@@ -27,29 +52,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!getToken()) return;
     const [me, sub] = await Promise.all([apiMe(), apiGetSubscription()]);
     if (me) {
-      const tier = (me.subscription_tier ?? sub?.tier ?? "free") as "free" | "premium";
+      const backendTier = (me.subscription_tier ?? sub?.tier ?? "free") as "free" | "premium";
+      const storedTier = getStoredTier();
+      const tier = backendTier === "premium" || storedTier === "premium" ? "premium" : "free";
+      if (tier === "premium") setStoredTier("premium");
       setUser({
         id: me.id,
         email: me.email,
         startupName: me.startup?.name ?? me.name ?? "",
-        subscriptionTier: tier === "premium" ? "premium" : "free",
+        subscriptionTier: tier,
       });
     }
   }, []);
 
   useEffect(() => {
     if (!getToken()) {
+      setStoredTier(null);
       setIsLoading(false);
       return;
     }
     apiMe()
       .then((me) => {
         if (me) {
+          const backendTier = (me.subscription_tier as "free" | "premium") ?? "free";
+          const storedTier = getStoredTier();
+          const tier = backendTier === "premium" || storedTier === "premium" ? "premium" : "free";
+          if (tier === "premium") setStoredTier("premium");
           setUser({
             id: me.id,
             email: me.email,
             startupName: me.startup?.name ?? me.name ?? "",
-            subscriptionTier: (me.subscription_tier as "free" | "premium") ?? "free",
+            subscriptionTier: tier,
           });
         }
       })
@@ -81,10 +114,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logoutFn = useCallback(async () => {
     await apiLogout();
+    setStoredTier(null);
     setUser(null);
   }, []);
 
   const setSubscriptionTier = useCallback((tier: SubscriptionTier) => {
+    setStoredTier(tier);
     setUser((prev) => (prev ? { ...prev, subscriptionTier: tier } : null));
   }, []);
 

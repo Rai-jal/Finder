@@ -9,6 +9,7 @@ import { OpportunityCard } from "@/components/opportunity/OpportunityCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useReferenceData } from "@/lib/hooks/useReferenceData";
+import { useStartup } from "@/context/StartupContext";
 import { Select } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
@@ -31,8 +32,9 @@ export default function OpportunitiesPage() {
   const [stageFilter, setStageFilter] = useState("");
   const [closingSoon, setClosingSoon] = useState(false);
 
+  const startup = useStartup();
   const { data: opportunities = [], isLoading } = useQuery({
-    queryKey: ["opportunities", search, typeFilter, sectorFilter, stageFilter, closingSoon],
+    queryKey: ["opportunities", search, typeFilter, sectorFilter, stageFilter, closingSoon, startup?.startupId],
     queryFn: () =>
       getOpportunities({
         search: search || undefined,
@@ -40,6 +42,7 @@ export default function OpportunitiesPage() {
         sector: sectorFilter || undefined,
         stage: stageFilter || undefined,
         closingSoon: closingSoon || undefined,
+        startupId: startup?.startupId ?? undefined,
       }),
   });
 

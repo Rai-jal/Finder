@@ -86,6 +86,7 @@ export interface Application {
   id: string;
   opportunityId: string;
   opportunityTitle: string;
+  applicationQuestions?: string[];
   status: ApplicationStatus;
   progressPercent: number;
   answers: Record<string, string>;

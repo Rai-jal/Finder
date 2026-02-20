@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/context/AuthContext";
 import { useOnboarding } from "@/context/OnboardingContext";
+import { useStartup } from "@/context/StartupContext";
 import { useSavedOpportunities } from "@/context/SavedOpportunitiesContext";
 import { getOpportunities, getApplications } from "@/lib/api";
 import { OpportunityCard } from "@/components/opportunity/OpportunityCard";
@@ -31,6 +32,7 @@ const STAGES: Record<string, string> = {
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const startup = useStartup();
   const { profileCompletionPercent, onboardingData } = useOnboarding();
   const { savedIds } = useSavedOpportunities();
   const [activeTab, setActiveTab] = useState<"top" | "saved">("top");
@@ -40,8 +42,8 @@ export default function DashboardPage() {
   const stage = STAGES[onboardingData?.qualification?.stage ?? ""] ?? "your stage";
 
   const { data: opportunities = [] } = useQuery({
-    queryKey: ["opportunities"],
-    queryFn: () => getOpportunities(),
+    queryKey: ["opportunities", startup?.startupId],
+    queryFn: () => getOpportunities({ startupId: startup?.startupId ?? undefined }),
   });
 
   const { data: applications = [] } = useQuery({

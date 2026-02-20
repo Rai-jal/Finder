@@ -14,6 +14,12 @@ import { cn } from "@/lib/utils";
 
 const MAX_CHARS = 500;
 
+const DEFAULT_APPLICATION_QUESTIONS = [
+  "Tell us about your startup and what it does.",
+  "What problem does your solution address, and who is your target market?",
+  "How will you use this funding, and what milestones will you achieve?",
+];
+
 export default function ApplicationWorkspacePage({
   params,
 }: {
@@ -57,7 +63,8 @@ export default function ApplicationWorkspacePage({
 
   // Initialize local answers from application
   const answers = { ...application?.answers, ...localAnswers };
-  const questions = opportunity?.applicationQuestions ?? [];
+  const questions =
+    application?.applicationQuestions ?? opportunity?.applicationQuestions ?? DEFAULT_APPLICATION_QUESTIONS;
   const isPremium = subscriptionTier === "premium";
 
   if (appLoading || !application) {

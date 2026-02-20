@@ -12,7 +12,7 @@ function NewApplicationContent() {
   const opportunityId = searchParams.get("opportunity") ?? "";
   const [created, setCreated] = useState(false);
 
-  const { data: opportunity } = useQuery({
+  const { data: opportunity, isFetched } = useQuery({
     queryKey: ["opportunity", opportunityId],
     queryFn: () => getOpportunity(opportunityId),
     enabled: !!opportunityId,
@@ -24,11 +24,15 @@ function NewApplicationContent() {
       return;
     }
     if (!opportunity || created) return;
-    createApplication(opportunityId, opportunity.title).then((app) => {
+    if (isFetched && !opportunity) {
+      router.replace("/opportunities");
+      return;
+    }
+    createApplication(opportunityId, opportunity.title, opportunity.applicationQuestions).then((app) => {
       setCreated(true);
       router.replace(`/applications/${app.id}`);
     });
-  }, [opportunityId, opportunity, created, router]);
+  }, [opportunityId, opportunity, created, isFetched, router]);
 
   if (!opportunityId) return null;
 

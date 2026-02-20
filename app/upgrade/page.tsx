@@ -6,7 +6,7 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Check } from "lucide-react";
+import { Check, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiGetSubscriptions, apiSubscribe } from "@/lib/api/client";
 import type { ApiSubscription } from "@/lib/api/client";
@@ -31,6 +31,8 @@ export default function UpgradePage() {
   const { subscriptionTier, refreshUser, setSubscriptionTier } = useAuth();
   const [plans, setPlans] = useState<ApiSubscription[]>([]);
   const [loading, setLoading] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
 
   useEffect(() => {
     apiGetSubscriptions()
@@ -40,14 +42,26 @@ export default function UpgradePage() {
 
   const handleSubscribe = async (subscriptionId: string) => {
     setLoading(subscriptionId);
+    setError(null);
+    setSuccess(false);
     try {
-      await apiSubscribe(subscriptionId);
+      await apiSubscribe(String(subscriptionId));
       await refreshUser();
-    } catch {
-      // Keep current state on error
+      setSubscriptionTier("premium");
+      setSuccess(true);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Upgrade failed. Please try again or contact support.";
+      setError(message);
     } finally {
       setLoading(null);
     }
+  };
+
+  const handleDemoUpgrade = () => {
+    setError(null);
+    setSuccess(false);
+    setSubscriptionTier("premium");
+    setSuccess(true);
   };
 
   const premiumPlan = plans.find(
@@ -124,13 +138,34 @@ export default function UpgradePage() {
                   </li>
                 ))}
               </ul>
+              {(error || success) && (
+                <div
+                  className={cn(
+                    "rounded-lg border p-3 text-sm",
+                    error && "border-destructive bg-destructive/10 text-destructive",
+                    success && "border-green-500/50 bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400"
+                  )}
+                >
+                  {error ? (
+                    <span className="flex items-center gap-2">
+                      <AlertCircle className="h-4 w-4 shrink-0" />
+                      {error}
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-2">
+                      <Check className="h-4 w-4 shrink-0" />
+                      You&apos;re now Premium! Enjoy full access.
+                    </span>
+                  )}
+                </div>
+              )}
               <Button
                 className="w-full"
                 size="lg"
                 onClick={() =>
                   premiumPlan
                     ? handleSubscribe(premiumPlan.id)
-                    : setSubscriptionTier("premium")
+                    : handleDemoUpgrade()
                 }
                 disabled={subscriptionTier === "premium" || loading === premiumPlan?.id}
               >

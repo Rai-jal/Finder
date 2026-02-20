@@ -208,6 +208,23 @@ function mapOpportunity(o: ApiOpportunity, index?: number) {
   };
 }
 
+function extractOpportunitiesList(res: unknown): unknown[] {
+  if (Array.isArray(res)) return res;
+  const obj = res as Record<string, unknown>;
+  const candidates = [
+    obj?.data,
+    obj?.items,
+    obj?.opportunities,
+    obj?.results,
+    (obj?.data as Record<string, unknown>)?.data,
+    (obj?.data as Record<string, unknown>)?.items,
+  ];
+  for (const c of candidates) {
+    if (Array.isArray(c)) return c;
+  }
+  return [];
+}
+
 export async function apiGetOpportunities(params?: {
   page?: number;
   per_page?: number;
@@ -216,13 +233,14 @@ export async function apiGetOpportunities(params?: {
   if (params?.page) search.set("page", String(params.page));
   if (params?.per_page) search.set("per_page", String(params.per_page ?? 50));
   const q = search.toString();
-  const res = await api<{ data?: unknown[]; items?: unknown[] }>(
-    `/opportunities${q ? `?${q}` : ""}`
-  );
-  const list = res.data ?? res.items ?? [];
+  const res = await api<unknown>(`/opportunities${q ? `?${q}` : ""}`);
+  const list = extractOpportunitiesList(res);
+  const obj = res as Record<string, unknown>;
+  const meta = (obj?.meta ?? obj?.pagination) as { total?: number } | undefined;
+  const total = (obj?.total as number) ?? meta?.total;
   return {
-    data: Array.isArray(list) ? list : [],
-    total: (res as { total?: number }).total,
+    data: list,
+    total,
   };
 }
 
@@ -349,8 +367,9 @@ export async function apiUnsaveOpportunity(startupId: string, opportunityId: str
 // --- Matches (opportunities matched to startup profile) ---
 
 export async function apiGetMatches(startupId: string): Promise<ApiOpportunity[]> {
-  const res = await api<{ data?: ApiOpportunity[] }>(`/startups/${startupId}/matches`);
-  return res.data ?? [];
+  const res = await api<unknown>(`/startups/${startupId}/matches`);
+  const list = extractOpportunitiesList(res);
+  return list as ApiOpportunity[];
 }
 
 // --- Documents ---
@@ -483,10 +502,28 @@ export interface ApiSubscription {
   [key: string]: unknown;
 }
 
+function extractSubscriptionList(res: unknown): ApiSubscription[] {
+  if (Array.isArray(res)) return res as ApiSubscription[];
+  const obj = res as Record<string, unknown>;
+  const candidates = [
+    obj?.data,
+    obj?.items,
+    obj?.subscriptions,
+    obj?.plans,
+  ];
+  for (const c of candidates) {
+    if (Array.isArray(c)) return c as ApiSubscription[];
+  }
+  return [];
+}
+
 export async function apiGetSubscriptions(): Promise<ApiSubscription[]> {
-  const res = await api<{ data?: ApiSubscription[] } | ApiSubscription[]>("/subscriptions");
-  if (Array.isArray(res)) return res;
-  return (res as { data?: ApiSubscription[] }).data ?? [];
+  try {
+    const res = await api<unknown>("/subscriptions");
+    return extractSubscriptionList(res);
+  } catch {
+    return [];
+  }
 }
 
 export async function apiGetSubscription(): Promise<{ tier?: string } | null> {

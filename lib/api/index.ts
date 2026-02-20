@@ -59,6 +59,40 @@ const FUNDING_TYPE_LABELS: Record<string, string> = {
   other: "Other",
 };
 
+/** Normalize application questions from API (string[] or object[] with question/text) */
+function normalizeApplicationQuestions(o: api.ApiOpportunity): string[] {
+  const raw = o.application_questions ?? o.questions ?? o.application_questions_data;
+  if (!raw) return [];
+  if (Array.isArray(raw)) {
+    return raw.map((q: unknown) =>
+      typeof q === "string" ? q : (q as { question?: string; text?: string })?.question ?? (q as { question?: string; text?: string })?.text ?? String(q)
+    );
+  }
+  return [];
+}
+
+/** Derive sector from industries array (backend may use industries[] instead of sector) */
+function sectorFromOpportunity(o: api.ApiOpportunity): string | undefined {
+  const sector = o.sector as string | undefined;
+  if (sector) return sector;
+  const industries = o.industries as { slug?: string; name?: string }[] | undefined;
+  if (Array.isArray(industries) && industries[0]) {
+    return industries[0].slug ?? industries[0].name;
+  }
+  return (o.industry as string) ?? undefined;
+}
+
+/** Derive stage from stages array (backend may use stages[] instead of stage) */
+function stageFromOpportunity(o: api.ApiOpportunity): string | undefined {
+  const stage = o.stage as string | undefined;
+  if (stage) return stage;
+  const stages = o.stages as { slug?: string; name?: string }[] | undefined;
+  if (Array.isArray(stages) && stages[0]) {
+    return stages[0].slug ?? stages[0].name;
+  }
+  return undefined;
+}
+
 function mapApiOpportunity(o: api.ApiOpportunity): Opportunity {
   const rawType = (o.type ?? o.funding_type ?? "grant") as string;
   const typeLabel =
@@ -72,28 +106,43 @@ function mapApiOpportunity(o: api.ApiOpportunity): Opportunity {
     shortDescription: ((o.description ?? "") as string).slice(0, 150),
     summary: (o.description ?? "") as string,
     matchPercent: o.match_score as number | undefined,
-    sector: o.sector as string | undefined,
-    stage: o.stage as string | undefined,
-    eligibility: o.eligibility as string | undefined,
+    sector: sectorFromOpportunity(o),
+    stage: stageFromOpportunity(o),
+    eligibility: (o.eligibility ?? o.eligibility_criteria) as string | undefined,
     requiredDocuments: (o.required_documents as string[]) ?? [],
-    applicationQuestions: (o.application_questions as string[]) ?? [],
+    applicationQuestions: normalizeApplicationQuestions(o),
   };
 }
 
-export async function getOpportunities(filters?: {
-  type?: string;
-  sector?: string;
-  stage?: string;
-  closingSoon?: boolean;
-  search?: string;
-  page?: number;
-  per_page?: number;
-}): Promise<Opportunity[]> {
+/**
+ * Fetch opportunities. When startupId is provided and /opportunities returns empty,
+ * fall back to /startups/{id}/matches (personalized matches).
+ */
+export async function getOpportunities(
+  filters?: {
+    type?: string;
+    sector?: string;
+    stage?: string;
+    closingSoon?: boolean;
+    search?: string;
+    page?: number;
+    per_page?: number;
+    startupId?: string | null;
+  }
+): Promise<Opportunity[]> {
   const res = await api.apiGetOpportunities({
     page: filters?.page,
     per_page: filters?.per_page ?? 50,
   });
   let list = (res.data ?? []) as api.ApiOpportunity[];
+  if (list.length === 0 && filters?.startupId) {
+    try {
+      const matches = await api.apiGetMatches(filters.startupId);
+      list = Array.isArray(matches) ? matches : [];
+    } catch {
+      // ignore - use empty list
+    }
+  }
   if (filters?.search) {
     const s = filters.search.toLowerCase();
     list = list.filter(
@@ -159,7 +208,8 @@ export async function getApplication(id: string): Promise<Application | null> {
 
 export async function createApplication(
   opportunityId: string,
-  opportunityTitle: string
+  opportunityTitle: string,
+  applicationQuestions?: string[]
 ): Promise<Application> {
   const apps = getStoredApplications();
   const existing = apps.find((a) => a.opportunityId === opportunityId);
@@ -168,6 +218,7 @@ export async function createApplication(
     id: `app-${Date.now()}`,
     opportunityId,
     opportunityTitle,
+    applicationQuestions: applicationQuestions ?? [],
     status: "draft",
     progressPercent: 0,
     answers: {},
@@ -276,7 +327,7 @@ const CATEGORY_TO_FUNDING_TYPE: Record<string, "grant" | "equity" | "debt" | "pr
 
 /**
  * Map qualification to API payload.
- * BACKEND EXPECTS SLUGS not IDs. Form stores IDs; we map to slugs before sending.
+ * Backend validates industry/stage by slug. Form stores IDs; map to slugs before sending.
  */
 async function mapToApiPayload(qualification: OnboardingData["qualification"]) {
   const countryCode = qualification.country?.slice(0, 3) || undefined;
@@ -288,7 +339,6 @@ async function mapToApiPayload(qualification: OnboardingData["qualification"]) {
   }
 
   const [industries, stages] = await Promise.all([getIndustries(), getStages()]);
-
   const idToIndustrySlug = new Map(industries.map((i) => [String(i.id), i.slug]));
   const idToStageSlug = new Map(stages.map((s) => [String(s.id), s.slug]));
 
